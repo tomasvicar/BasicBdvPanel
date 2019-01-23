@@ -8,13 +8,29 @@
 
 package de.csbd.learnathon.command;
 
+import java.awt.Dimension;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+import org.scijava.Context;
 import org.scijava.ItemIO;
 import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.ui.UIService;
 
+import ij.IJ;
+import net.imagej.Dataset;
 import net.imagej.ImageJ;
+import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.converter.Converters;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.type.numeric.real.DoubleType;
+import net.imglib2.util.Util;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * This example illustrates how to create an ImageJ {@link Command} plugin.
@@ -28,19 +44,45 @@ import net.imglib2.type.numeric.RealType;
  */
 @Plugin( type = Command.class, menuPath = "Plugins>Hello World" )
 public class HelloWorldCommand<T extends RealType<T>> implements Command {
-    //
-    // Feel free to add more parameters here...
-    //
+	
+	
+	@Parameter
+	Dataset image;
 
-	@Parameter( type = ItemIO.OUTPUT )
-    private String out;
+	@Parameter
+	Context context;
+
+	@Parameter
+	UIService ui;
+
+	JFrame frame;
+	
+	
+	private SimplePanel panel;
+
 
    
     @Override
-    public void run() {
-		out = "Hello World";
-		System.out.println( "Hello World" );
-    }
+	public void run() {
+		panel = new SimplePanel( toDoubleType( image.getImgPlus().getImg() ), context);
+		JPanel p = panel.getPanel();
+		p.setMinimumSize(new Dimension(1000,  1000));
+		frame = new JFrame( image.getImgPlus().getSource() );
+		frame.setLayout( new MigLayout( "", "[grow]", "[][]" ) );
+		frame.add( p, "h 100%, grow, wrap" );
+		frame.addWindowListener( new WindowAdapter() {
+
+			@Override
+			public void windowClosed( final WindowEvent windowEvent ) {
+				panel.close();
+			}
+		} );
+
+		frame.setBounds( 100, 100, 1600, 1200 );
+		frame.pack();
+		frame.setVisible( true );
+	}	
+    	
 
     /**
      * This main function serves for development purposes.
@@ -54,8 +96,19 @@ public class HelloWorldCommand<T extends RealType<T>> implements Command {
         // create the ImageJ application context with all available services
         final ImageJ ij = new ImageJ();
         ij.ui().showUI();
+        
+        IJ.openImage( "res/Stack.tif" ).show();
+
+        ij.command().run( HelloWorldCommand.class, true );
 
 
     }
+    
+    
+    public static RandomAccessibleInterval< DoubleType > toDoubleType( final RandomAccessibleInterval< ? extends RealType< ? > > image ) {
+		if ( Util.getTypeFromInterval( image ) instanceof DoubleType )
+			return ( RandomAccessibleInterval< DoubleType > ) image;
+		return Converters.convert( image, ( i, o ) -> o.setReal( i.getRealDouble() ), new DoubleType() );
+	}
 
 }
